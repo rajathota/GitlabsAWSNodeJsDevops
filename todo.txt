@@ -1,0 +1,131 @@
+# Project: DevOps CI/CD Pipeline for Flask API on AWS Lambda & Node.js Frontend on S3
+
+# Project Structure:
+.
+├── backend-flask
+│   ├── Dockerfile
+│   ├── app.py
+│   └── requirements.txt
+├── frontend-nodejs
+│   ├── dist/
+│   └── index.html
+├── .gitlab-ci.yml
+└── terraform
+    ├── lambda.tf
+    ├── s3.tf
+    ├── cloudfront.tf
+    └── variables.tf
+
+# 1. Backend: Python Flask App (REST API)
+# backend-flask/app.py
+from flask import Flask
+from flask_restx import Api, Resource
+
+app = Flask(__name__)
+api = Api(app)
+
+@api.route('/hello')
+class HelloWorld(Resource):
+    def get(self):
+        return {'message': 'Hello, World!'}
+
+if __name__ == "__main__":
+    app.run(debug=True)
+
+# backend-flask/requirements.txt
+flask
+flask-restx
+
+# backend-flask/Dockerfile
+FROM public.ecr.aws/lambda/python:3.9
+
+COPY requirements.txt ./
+RUN pip install -r requirements.txt
+
+COPY app.py ./
+
+CMD ["app.handler"]
+
+# 2. Frontend: Node.js App
+# Assume it's built and ready in /frontend-nodejs/dist
+
+# 3. GitLab CI/CD Pipeline
+# .gitlab-ci.yml
+stages:
+  - build
+  - deploy
+
+variables:
+  AWS_REGION: us-east-1
+
+before_script:
+  - apk add --no-cache python3 py3-pip curl jq
+  - pip3 install awscli
+
+# Backend: Flask API Deployment to AWS Lambda
+build-backend:
+  stage: build
+  script:
+    - cd backend-flask
+    - zip -r function.zip .
+  artifacts:
+    paths:
+      - backend-flask/function.zip
+
+deploy-backend:
+  stage: deploy
+  script:
+    - aws lambda update-function-code \
+        --function-name my-flask-api \
+        --zip-file fileb://backend-flask/function.zip \
+        --region $AWS_REGION
+
+# Frontend: Node.js Static Site Deployment to S3
+deploy-frontend:
+  stage: deploy
+  script:
+    - cd frontend-nodejs/dist
+    - aws s3 sync . s3://my-frontend-bucket --delete
+    - aws cloudfront create-invalidation --distribution-id E123ABC456DEF --paths '/*'
+
+# 4. Terraform for Infrastructure Automation
+# terraform/variables.tf
+variable "aws_region" { default = "us-east-1" }
+variable "lambda_function_name" { default = "my-flask-api" }
+variable "s3_bucket_name" { default = "my-frontend-bucket" }
+
+# terraform/lambda.tf
+resource "aws_lambda_function" "flask_api" {
+  filename         = "backend-flask/function.zip"
+  function_name    = var.lambda_function_name
+  role             = aws_iam_role.lambda_exec.arn
+  handler          = "app.handler"
+  runtime          = "python3.9"
+  source_code_hash = filebase64sha256("backend-flask/function.zip")
+}
+
+# terraform/s3.tf
+resource "aws_s3_bucket" "frontend_bucket" {
+  bucket = var.s3_bucket_name
+  acl    = "public-read"
+}
+
+# terraform/cloudfront.tf
+resource "aws_cloudfront_distribution" "frontend_cdn" {
+  origin {
+    domain_name = aws_s3_bucket.frontend_bucket.bucket_regional_domain_name
+    origin_id   = "s3-frontend"
+  }
+  enabled             = true
+  default_root_object = "index.html"
+}
+
+# 5. Rollback Strategies & Testing
+# Example rollback in deploy-backend job
+# (can be extended with versioning and aliases in Lambda)
+
+# 6. IAM and Security
+# Terraform can manage IAM roles and policies for Lambda and S3 access
+
+# 7. Monitoring (Optional for sample project)
+# Add CloudWatch alarms & logging via Terraform
