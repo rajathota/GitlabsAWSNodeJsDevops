@@ -129,3 +129,18 @@ resource "aws_cloudfront_distribution" "frontend_cdn" {
 
 # 7. Monitoring (Optional for sample project)
 # Add CloudWatch alarms & logging via Terraform
+
+ Here's a sample project aligned with the job description you provided!
+
+Project Highlights:
+🐍 Flask REST API deployed to AWS Lambda
+⚡ Node.js frontend deployed to AWS S3 + CloudFront
+🔧 CI/CD pipeline implemented in GitLab
+☁️ Infrastructure automation via Terraform
+🔗 What's Included (check the Devops Gitlab Aws Project textdoc):
+
+Flask REST API code and Dockerfile
+Terraform configs for Lambda, S3, and CloudFront
+GitLab CI/CD pipeline to build, deploy, and automate everything
+IAM & security placeholders to secure Lambda & S3
+Notes on automated testing, rollback strategies, and monitoring options
